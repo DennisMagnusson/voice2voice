@@ -8,9 +8,24 @@ sys.path.append('..')
 #from .. import wav_to_mel 
 from util import wav_to_mel
 
-def get_data():
+from os import walk, listdir
+
+from tqdm import tqdm
+
+def get_data(base_path):
+  x = []
+  y = []
+  i = 0
+  for sub in tqdm(walk(base_path), total=471):
+    i += 1
+    subdir = sub[0]
+    files = [x for x in listdir(subdir) if x.endswith('.PHN')]
+    for base_filename in files:
+      x_batch, y_batch = read_data(subdir + '/' + base_filename[:-4])# Remove suffix
+      x.append(x_batch)
+      y.append(y_batch)
   
-  pass
+  return x, y
 
 
 def read_data(path):
@@ -29,19 +44,20 @@ def read_data(path):
   #wav = wav[start_index:end_index]
 
   #mel = wav_to_mel(wav, './UniversalVocoding/config2.json')
-  mel = wav_to_mel(wav_filename, './UniversalVocoding/config2.json')
+  mel = wav_to_mel(wav_filename, config_filename='../UniversalVocoding/config2.json')
 
 
   vocab_dict = get_dict()
 
-  phones = np.zeros((len(mel), (len(vocab_dict))))
-  print(phones.shape)
+  #phones = np.zeros((len(mel), (len(vocab_dict))))
+  phones = np.zeros((len(mel)), dtype=np.int32)
+  #print(phones.shape)
   for i in phn_file:
     start, end, label = i.split()
     start = int(start) // 80
     end = int(end) // 80
     #phones[start-start_index:end-start_index][vocab_dict[label]] = 1
-    phones[start:end, vocab_dict[label]] = 1
+    phones[start:end] = vocab_dict[label]
   
   return mel, phones
 
