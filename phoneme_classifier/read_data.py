@@ -8,6 +8,8 @@ sys.path.append('..')
 #from .. import wav_to_mel 
 from util import wav_to_mel
 
+from random import shuffle
+
 from os import walk, listdir
 
 from tqdm import tqdm
@@ -24,7 +26,11 @@ def get_data(base_path):
       x_batch, y_batch = read_data(subdir + '/' + base_filename[:-4])# Remove suffix
       x.append(x_batch)
       y.append(y_batch)
-  
+
+  # Shuffle
+  c = list(zip(x, y))
+  shuffle(c)
+  x, y = zip(*c)
   return x, y
 
 
