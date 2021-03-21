@@ -1,0 +1,11 @@
+16khz/*
+*.wav
+*.npy
+phoneme_classifier/TIMIT-data/*
+wandb/*
+speech_data/*
+__pycache__/*
+*.pth
+*.zip
+*.pyc
+*.swp

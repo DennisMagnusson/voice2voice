@@ -12,11 +12,10 @@ import soundfile
 
 import torch
 
-def wav_to_mel(filename):
+def wav_to_mel(filename, config_filename='UniversalVocoding/config.json'):
   #sample_rate, samples = wavfile.read(filename)
   #freq, times, spectrogram = signal.spectrogram(samples, sample_rate)
-
-  return get_mel(filename)
+  return get_mel(filename, config_filename=config_filename)
 
 def get_vocoder(device):
   with open('UniversalVocoding/config.json') as f:
@@ -43,7 +42,42 @@ def mel_to_wav(vocoder, mel):
 def write_wav(wav, filename):
   sample_rate = 16000
   soundfile.write(filename, wav, sample_rate)
-  
 
+
+if __name__=='__main__':
+  from os import listdir
+  import librosa
+  import librosa.display
+  from matplotlib import pyplot as plt
+  base_folder = './speech_data/16khz/'
+  i = 0
+  filenames = [base_folder+x for x in listdir(base_folder) if x.endswith('.wav')]
+  for filename in filenames:
+    print(filename)
+    mel1 = wav_to_mel(filename, 'UniversalVocoding/config.json')
+    mel2 = wav_to_mel(filename, 'UniversalVocoding/config2.json')
+
+    s1 = mel1.shape[0]
+    s2 = mel2.shape[0]
+
+    #print('len1 = ' + str(s1))
+    #print('len2 = ' + str(s2))
+    #print(s1*2.5-s2)
+    i += 1
+    """
+    librosa.display.specshow(mel1.T, y_axis='mel', fmax=8000, x_axis='time')
+    plt.title('mel1')
+    plt.show()
+    librosa.display.specshow(mel2.T, y_axis='mel', fmax=8000, x_axis='time')
+    plt.title('mel2')
+    plt.show()
+    """
+    #print(mel1.shape[0])
+    #print(mel2.shape)
+    if i == 50:
+      die()
+
+  
+  
 
 
