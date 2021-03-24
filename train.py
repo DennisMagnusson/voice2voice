@@ -37,50 +37,111 @@ import wandb
 class MelGenerator(nn.Module):
   def __init__(self):
     super(MelGenerator, self).__init__()
-    #self.linear0 = nn.Linear(61, 256)
-    self.linear0 = nn.Linear(62, 512)
-    self.dropout0 = nn.Dropout(0.1)
-    self.bn0 = nn.BatchNorm1d(512)
-    self.lstm1 = nn.GRU(512, 256, 1, dropout=0.1, batch_first=True, bidirectional=True)
-    #self.dropout = nn.Dropout(0.1)
-    #self.bn1 = nn.BatchNorm1d(512)
-    self.linear1 = nn.Linear(512, 512)
+    self.enclinear0 = nn.Linear(62, 256)
+    self.encdropout0 = nn.Dropout(0.2)
+    self.enclinear1 = nn.Linear(256, 128)
+    self.encdropout1 = nn.Dropout(0.2)
 
+    self.conv0 = ConvThingy(128, 128, 3, nn.ReLU())
+    self.conv1 = ConvThingy(128, 256, 3, nn.ReLU())
+    #self.cbhg0 = CBHG(128, 8)
+    self.linear1 = nn.Linear(256, 256)
+    self.cbhg1 = CBHG(256, 16)
     self.pool = nn.MaxPool1d(8, stride=4, padding=2)
+    self.declinear0 = nn.Linear(512, 256)
+    self.declinear1 = nn.Linear(256, 80)
 
-    self.lstm2 = nn.GRU(512, 512, 3, dropout=0.1, batch_first=True, bidirectional=True)
-
-    self.linear2 = nn.Linear(1024, 512)
-    self.bn2 = nn.BatchNorm1d(512)
-
-
-    self.bn3 = nn.BatchNorm1d(512)
-    self.linear3 = nn.Linear(512, 80)#TODO Fill in this thingy
 
   def forward(self, x, hidden=None):
-    out = self.linear0(x)
-    out = self.bn0(out.transpose(1, 2)).transpose(1, 2)
-    out = torch.sigmoid(out)
+    out = F.relu(self.encdropout0(self.enclinear0(x)))
+    out = F.relu(self.encdropout1(self.enclinear1(out)))
 
-    out, hx = self.lstm1(out, hidden)
-    #out = self.bn1(out.transpose(1, 2)).transpose(1, 2)
-    #out = self.dropout0(out)
-    out = self.linear1(out)
-    out = self.pool(out.transpose(1, 2)).transpose(1, 2)
-    out, _ = self.lstm2(out, None)
+    out = out.transpose(1, 2)
+    out = self.conv0(out)
+    out = self.conv1(out)
+    out = self.pool(out)
+    out = out.transpose(1, 2)
 
-    out = self.linear2(out)
-    out = self.bn2(out.transpose(1, 2)).transpose(1, 2)
-    out = torch.sigmoid(out)
-    out = self.linear3(out)
+    out = F.relu(self.linear1(out))
+    out = self.cbhg1(out)
+    out = F.relu(self.declinear0(out))
+    out = self.declinear1(out)
+    
+    out = 3*torch.sigmoid(out)
 
-    out = 3*F.sigmoid(out)
+    return out, 0
 
-    #out = self.linear3(out)
-    #out = F.relu(out) - 5
-    #out = torch.sigmoid(out)
-    #out = torch.transpose(out, 1, 2)
-    return out, hx 
+
+class ConvThingy(nn.Module):
+  def __init__(self, in_size, out_size, kernel_size, activation):
+    super(ConvThingy, self).__init__()
+    self.bn = nn.BatchNorm1d(out_size)
+    self.activation = activation
+    self.pad = nn.ConstantPad1d(((kernel_size-1)//2, kernel_size//2), 0)
+    self.conv = nn.Conv1d(in_size, out_size, kernel_size)
+
+  def forward(self, x):
+    out = self.pad(x)
+    out = self.conv(out)
+    out = self.bn(out)
+    if self.activation:
+      return self.activation(out)
+    return out
+    
+class Highway(nn.Module):
+  def __init__(self, size):
+    super(Highway, self).__init__()
+    self.one = nn.Linear(size, size)
+    self.two = nn.Linear(size, size)
+
+  def forward(self, x):
+    x0 = F.relu(self.one(x))
+    x1 = torch.sigmoid(self.two(x))
+
+    return x0 * x1 + x*(1.0 - x1)
+
+class CBHG(nn.Module):
+  def __init__(self, size, k):
+    super(CBHG, self).__init__()
+
+    convies = []
+    for i in range(1, k+1):
+      convies.append(ConvThingy(size, size, i, nn.ReLU()))
+    
+    self.convies = nn.ModuleList(convies)
+
+    pool_size = 2
+    self.poolpad = nn.ConstantPad1d(((pool_size-1)//2, pool_size//2), 0)
+    self.pool = nn.MaxPool1d(pool_size, stride=1)
+
+    self.proj1 = ConvThingy(k*size, size, 3, nn.ReLU())
+    self.proj2 = ConvThingy(size, size, 3, None)
+
+    highways = []
+    for i in range(4):
+      highways.append(Highway(size))
+    self.highways = nn.ModuleList(highways)
+    self.gru = nn.GRU(size, size, 1, dropout=0.1, batch_first=True, bidirectional=True)
+    
+  def forward(self, x):
+    out = x.transpose(1, 2)
+    outs = []
+    for conv in self.convies:
+      outs.append(conv(out))
+
+    out = torch.cat(outs, dim=1)
+    out = self.pool(self.poolpad(out))
+    out = self.proj1(out)
+    out = self.proj2(out)
+    
+    out = out.transpose(1, 2)
+
+    out += x
+    for h in self.highways:
+      out = h(out)
+
+    out, _ = self.gru(out)
+    return out
 
 def generate(model, phoneme_classifier, vocoder, name='1it'):
   files = [a for a in ['LJ042-0033.wav', 'LJ008-0195.wav', 'LJ050-0174.wav']]
@@ -223,12 +284,13 @@ if __name__ == '__main__':
     #optimizer = things['optimizer']
     #sched = things['scheduler']
 
-    sched = ReduceLROnPlateau(optimizer, factor=0.5, patience=100, threshold=0.000000001, verbose=True)
-    criterion = nn.MSELoss()
+    sched = ReduceLROnPlateau(optimizer, factor=0.8, patience=100, threshold=0.000000001, verbose=True)
+    #criterion = nn.MSELoss()
+    criterion = nn.L1Loss()
     torch.autograd.set_detect_anomaly(True)
 
     smooth_loss = 0.15
-    batch_size = wandb.config.batch_size = 16
+    batch_size = wandb.config.batch_size = 32
     seq_len = wandb.config.seq_len = 256
     fmax = wandb.fmax = 500
     k = wandb.k = 1
@@ -251,7 +313,7 @@ if __name__ == '__main__':
         loss.backward(retain_graph=retain_graph)
         optimizer.step()
 
-        wandb.log({'loss': loss.item()})
+        wandb.log({'loss': loss.item()**2})
 
         
         sched.step(loss.item())
