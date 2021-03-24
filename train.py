@@ -268,7 +268,7 @@ def get_vocoder():
 
 
 
-def main(device='cpu'):
+def main(device='cpu', batch_size=32):
     #things = torch.load('./models/mel-generator-model-500it.pth')
     wandb.init(project='MelGenerator')
     phoneme_classifier = PhonemeClassifier().to(device)
@@ -294,7 +294,7 @@ def main(device='cpu'):
     torch.autograd.set_detect_anomaly(True)
 
     smooth_loss = 0.15
-    batch_size = wandb.config.batch_size = 32
+    batch_size = wandb.config.batch_size = batch_size
     seq_len = wandb.config.seq_len = 256
     fmax = wandb.fmax = 500
     k = wandb.k = 1
@@ -332,5 +332,5 @@ def main(device='cpu'):
             generate(model, phoneme_classifier, vocoder, name='{}it'.format(counter), device=device, k=k)
   
 if __name__ == '__main__':
-    main(device='cpu')
+    main(device='cpu', batch_size=32)
     
