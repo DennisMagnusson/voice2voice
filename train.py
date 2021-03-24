@@ -143,7 +143,7 @@ class CBHG(nn.Module):
     out, _ = self.gru(out)
     return out
 
-def generate(model, phoneme_classifier, vocoder, name='1it'):
+def generate(model, phoneme_classifier, vocoder, name='1it', device='cpu', k=1):
   files = [a for a in ['LJ042-0033.wav', 'LJ008-0195.wav', 'LJ050-0174.wav']]
   model.eval()
   phoneme_classifier.eval()
@@ -158,12 +158,13 @@ def generate(model, phoneme_classifier, vocoder, name='1it'):
     mel = wav_to_mel(wav, sr).T
     mel_vocoder = vocoder(torch.Tensor([wav]))[0].T
     #f0, prob = get_pyin(wav, sr)
-    f0 = get_pyin(wav, sr, k=4)
+    f0 = torch.Tensor(get_pyin(wav, sr, k=k)).to(device)
     with torch.no_grad():
       phones, _ = phoneme_classifier(torch.Tensor([mel]))
+      phones = phones.to(device)
       #phones = F.softmax(phones/0.7, dim=1)
       #inpu = torch.cat((phones.transpose(1, 2), torch.Tensor(f0), torch.Tensor(prob)), 1)
-      inpu = torch.cat((phones.transpose(1, 2), torch.Tensor(f0).unsqueeze(0).unsqueeze(2)), 2)
+      inpu = torch.cat((phones.transpose(1, 2), f0.unsqueeze(0).unsqueeze(2)), 2)
       mel2, _ = model(inpu)
       #print(mel2.shape)
       
@@ -199,7 +200,7 @@ def generate(model, phoneme_classifier, vocoder, name='1it'):
 
   model.train()
 
-def get_batches(phoneme_classifier, vocoder, batch_size=64, seq_len=256, fmax=500, k=4):
+def get_batches(phoneme_classifier, vocoder, batch_size=64, seq_len=256, fmax=500, k=4, device='cpu'):
   base_folder = './speech_data/LJSpeech-1.1/wavs/'
   filenames = [x for x in listdir(base_folder) if x.endswith('.wav')]
   random.shuffle(filenames)
@@ -226,7 +227,7 @@ def get_batches(phoneme_classifier, vocoder, batch_size=64, seq_len=256, fmax=50
 
       batch_y.append((np.array(mel_vocoder[i//4:(i+seq_len)//4]) + 5.0) / 2.0)  #TODO Check if this is good
       if len(batch_x) >= batch_size:
-        batch_x = torch.Tensor(batch_x)
+        batch_x = torch.Tensor(batch_x).to(device)
         with torch.no_grad():
           # Apply softmax with 0.7 temperature (the best temperature)
           #batch_y, _ = F.softmax(phoneme_classifier(batch_x)/0.7)
@@ -263,11 +264,13 @@ def get_batches(phoneme_classifier, vocoder, batch_size=64, seq_len=256, fmax=50
 def get_vocoder():
     vocoder = torch.hub.load('descriptinc/melgan-neurips', 'load_melgan')
     return vocoder
-  
-if __name__ == '__main__':
+
+
+
+def main(device='cpu'):
     #things = torch.load('./models/mel-generator-model-500it.pth')
     wandb.init(project='MelGenerator')
-    phoneme_classifier = PhonemeClassifier()
+    phoneme_classifier = PhonemeClassifier().to(device)
     phoneme_classifier.load_state_dict(torch.load('./phoneme_classifier/models/phoneme-classifier-final64-state_dict-30ep.pth'))
 
     #phoneme_classifier = torch.load('./phoneme_classifier/models/phoneme-classifier--final2-model-50ep.pth')['model']
@@ -275,7 +278,7 @@ if __name__ == '__main__':
 
     vocoder = get_vocoder()#torch.hub.load('descriptinc/melgan-neurips', 'load_melgan')
 
-    model = MelGenerator()
+    model = MelGenerator().to(device)
     wandb.watch(model)
     #model.load_state_dict(torch.load('./models/mel-generator-state_dict-500it.pth'))
     lr = wandb.config.lr = 4e-4
@@ -296,10 +299,10 @@ if __name__ == '__main__':
     k = wandb.k = 1
     counter = 0
     for ep in range(100):
-      for batch in get_batches(phoneme_classifier, vocoder, batch_size=batch_size, seq_len=seq_len, fmax=fmax, k=k):
+      for batch in get_batches(phoneme_classifier, vocoder, batch_size=batch_size, seq_len=seq_len, fmax=fmax, k=k, device=device):
         x, y = batch
-        x = torch.Tensor(x)
-        y = torch.Tensor(y)
+        x = torch.Tensor(x).to(device)
+        y = torch.Tensor(y).to(device)
         counter += 1
         hx = None
         retain_graph = True
@@ -325,4 +328,8 @@ if __name__ == '__main__':
             saved_thing = {'model': model, 'optimizer': optimizer, 'scheduler': sched}
             torch.save(model.state_dict(), './models/mel-generator-state_dict-{}it.pth'.format(counter))
             torch.save(saved_thing, './models/mel-generator-model-{}it.pth'.format(counter))
-            generate(model, phoneme_classifier, vocoder, name='{}it'.format(counter))
+            generate(model, phoneme_classifier, vocoder, name='{}it'.format(counter), device=device, k=k)
+  
+if __name__ == '__main__':
+    main(device='cpu')
+    
