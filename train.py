@@ -160,7 +160,7 @@ def generate(model, phoneme_classifier, vocoder, name='1it', device='cpu', k=1):
     #f0, prob = get_pyin(wav, sr)
     f0 = torch.Tensor(get_pyin(wav, sr, k=k)).to(device)
     with torch.no_grad():
-      phones, _ = phoneme_classifier(torch.Tensor([mel]))
+      phones, _ = phoneme_classifier(torch.Tensor([mel]).to(device))
       phones = phones.to(device)
       #phones = F.softmax(phones/0.7, dim=1)
       #inpu = torch.cat((phones.transpose(1, 2), torch.Tensor(f0), torch.Tensor(prob)), 1)
@@ -174,17 +174,18 @@ def generate(model, phoneme_classifier, vocoder, name='1it', device='cpu', k=1):
 
         mel3 = mel2 * 2.0 - 5.0
         mel3 = torch.transpose(mel3, 1, 2)
-        gen_wav = vocoder.inverse(mel3)[0].numpy()
+        gen_wav = vocoder.inverse(mel3)[0].to('cpu').numpy()
         print('generating ./generated/{}/{}{}'.format(name, str(ex), filename))
-        soundfile.write('./generated/{}/{}{}'.format(name, str(ex), filename), gen_wav, 22500)
+        if device == 'cpu':
+          soundfile.write('./generated/{}/{}{}'.format(name, str(ex), filename), gen_wav, 22500)
         
-        plt.imshow(mel3[0].numpy(), aspect='auto', origin='lower')
+        plt.imshow(mel3[0].to('cpu').numpy(), aspect='auto', origin='lower')
         plt.colorbar()
         
         wandb.log({filename: plt}),
         plt.close()
 
-        plt.imshow(mel_vocoder.T, aspect='auto', origin='lower')
+        plt.imshow(mel_vocoder.to('cpu').T, aspect='auto', origin='lower')
         plt.colorbar()
 
         #plt.imshow(mel_vocoder, aspect='auto')
@@ -225,20 +226,20 @@ def get_batches(phoneme_classifier, vocoder, batch_size=64, seq_len=256, fmax=50
       batch_f0.append(f0[i:(i+seq_len)])
       #batch_prob.append(prob[i:(i+seq_len)])
 
-      batch_y.append((np.array(mel_vocoder[i//4:(i+seq_len)//4]) + 5.0) / 2.0)  #TODO Check if this is good
+      batch_y.append((np.array(mel_vocoder[i//4:(i+seq_len)//4].to('cpu')) + 5.0) / 2.0)
       if len(batch_x) >= batch_size:
         batch_x = torch.Tensor(batch_x).to(device)
         with torch.no_grad():
           # Apply softmax with 0.7 temperature (the best temperature)
           #batch_y, _ = F.softmax(phoneme_classifier(batch_x)/0.7)
-          batch_x, _ = phoneme_classifier(torch.Tensor(batch_x))
+          batch_x, _ = phoneme_classifier(batch_x)
           #inpu = torch.cat((batch_x.transpose(1, 2), torch.stack(batch_f0).unsqueeze(2), torch.stack(batch_prob).unsqueeze(2)), 2)
-          inpu = torch.cat((batch_x.transpose(1, 2), torch.stack(batch_f0).unsqueeze(2)), 2)
+          inpu = torch.cat((batch_x.transpose(1, 2), torch.stack(batch_f0).unsqueeze(2).to(device)), 2)
 
           
           #batch_y = F.softmax(batch_y/0.7, dim=1)
 
-        yield inpu, batch_y
+        yield inpu, torch.Tensor(batch_y).to(device)
         ti = time.time()
         batch_x = []
         batch_y = []
@@ -301,8 +302,8 @@ def main(device='cpu'):
     for ep in range(100):
       for batch in get_batches(phoneme_classifier, vocoder, batch_size=batch_size, seq_len=seq_len, fmax=fmax, k=k, device=device):
         x, y = batch
-        x = torch.Tensor(x).to(device)
-        y = torch.Tensor(y).to(device)
+        #x = torch.Tensor(x).to(device)
+        #y = torch.Tensor(y).to(device)
         counter += 1
         hx = None
         retain_graph = True
