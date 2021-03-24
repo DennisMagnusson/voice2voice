@@ -148,7 +148,8 @@ def generate(model, phoneme_classifier, vocoder, name='1it', device='cpu', k=1):
   model.eval()
   phoneme_classifier.eval()
   try:
-    mkdir('./generated/{}'.format(name))
+    if device == 'cpu':
+      mkdir('./generated/{}'.format(name))
   except FileExistsError:
     pass
 
