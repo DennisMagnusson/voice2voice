@@ -148,8 +148,7 @@ def generate(model, phoneme_classifier, vocoder, name='1it', device='cpu', k=1):
   model.eval()
   phoneme_classifier.eval()
   try:
-    if device == 'cpu':
-      mkdir('./generated/{}'.format(name))
+    mkdir('./generated/{}'.format(name))
   except FileExistsError:
     pass
 
@@ -177,8 +176,7 @@ def generate(model, phoneme_classifier, vocoder, name='1it', device='cpu', k=1):
         mel3 = torch.transpose(mel3, 1, 2)
         gen_wav = vocoder.inverse(mel3)[0].to('cpu').numpy()
         print('generating ./generated/{}/{}{}'.format(name, str(ex), filename))
-        if device == 'cpu':
-          soundfile.write('./generated/{}/{}{}'.format(name, str(ex), filename), gen_wav, 22500)
+        soundfile.write('./generated/{}/{}{}'.format(name, str(ex), filename), gen_wav, 22500)
         
         plt.imshow(mel3[0].to('cpu').numpy(), aspect='auto', origin='lower')
         plt.colorbar()
