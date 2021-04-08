@@ -42,19 +42,29 @@ class MelGenerator(nn.Module):
     self.enclinear1 = nn.Linear(256, 128)
     self.encdropout1 = nn.Dropout(0.2)
 
+    #self.linear0 = nn.Linear(256, 128)
+    #self.cbhg0 = CBHG(128, 8)
+
     self.conv0 = ConvThingy(128, 128, 3, nn.ReLU())
     self.conv1 = ConvThingy(128, 256, 3, nn.ReLU())
-    #self.cbhg0 = CBHG(128, 8)
     self.linear1 = nn.Linear(256, 256)
-    self.cbhg1 = CBHG(256, 16)
     self.pool = nn.MaxPool1d(8, stride=4, padding=2)
-    self.declinear0 = nn.Linear(512, 256)
+
+    self.cbhg1 = CBHG(256, 16)
+
+    #self.linear2 = nn.Linear(512, 512)
+    #self.cbhg2 = CBHG(512, 16)
+
+    self.declinear0 = nn.Linear(1024, 256)
     self.declinear1 = nn.Linear(256, 80)
 
 
   def forward(self, x, hidden=None):
     out = F.relu(self.encdropout0(self.enclinear0(x)))
     out = F.relu(self.encdropout1(self.enclinear1(out)))
+
+    #out = self.cbhg0(out)
+    #out = F.relu(self.linear0(out))
 
     out = out.transpose(1, 2)
     out = self.conv0(out)
@@ -64,6 +74,9 @@ class MelGenerator(nn.Module):
 
     out = F.relu(self.linear1(out))
     out = self.cbhg1(out)
+    #out = F.relu(self.linear2(out))
+    #out = self.cbhg2(out)
+
     out = F.relu(self.declinear0(out))
     out = self.declinear1(out)
     
@@ -201,8 +214,9 @@ def generate(model, phoneme_classifier, vocoder, name='1it', device='cpu', k=1):
   model.train()
 
 def get_batches(phoneme_classifier, vocoder, batch_size=64, seq_len=256, fmax=500, k=4, device='cpu'):
-  base_folder = './speech_data/LJSpeech-1.1/wavs/'
-  filenames = [x for x in listdir(base_folder) if x.endswith('.wav')]
+  base_folder = './processed_data/'
+  #filenames = [x.split('.')[0] for x in listdir(base_folder) if x.endswith('.npy')]
+  filenames = [a.split('.')[0] for a in ['LJ042-0033.wav', 'LJ008-0195.wav', 'LJ050-0174.wav']]
   random.shuffle(filenames)
   batch_x = []
   batch_y = []
@@ -214,19 +228,17 @@ def get_batches(phoneme_classifier, vocoder, batch_size=64, seq_len=256, fmax=50
 
   for filename in filenames:
     #mel = get_mel(base_folder+filename, config_filename='./UniversalVocoding/config2.json')
-    wav, sr = get_wav(base_folder+filename)
-    mel_phoneme = wav_to_mel(wav, sr).T
-    mel_vocoder = vocoder(torch.Tensor([wav]))[0].T
-    #ti = time.time()
-    #f0, prob = get_pyin(wav, sr)
-    f0 = get_pyin(wav, sr, k=k, fmax=fmax)
-    for i in range(0, len(mel_phoneme)-seq_len*4, seq_len*4):
-      batch_x.append(mel_phoneme[i:(i+seq_len)])
-      batch_f0.append(f0[i:(i+seq_len)])
-      #batch_prob.append(prob[i:(i+seq_len)])
-
-      batch_y.append((np.array(mel_vocoder[i//4:(i+seq_len)//4].to('cpu')) + 5.0) / 2.0)
+    x = np.load(base_folder + filename + '.wavx.npy')[0]
+    y = np.load(base_folder + filename + '.wavy.npy')
+    for i in range(0, len(x)-seq_len*4, seq_len*4):
+      batch_x.append(x[i:(i+seq_len*4)])
+      batch_y.append(y[i//4:(i//4+seq_len)])
       if len(batch_x) >= batch_size:
+        yield torch.Tensor(batch_x).to(device), torch.Tensor(batch_y).to(device)
+        batch_x = []
+        batch_y = []
+
+        """
         batch_x = torch.Tensor(batch_x).to(device)
         with torch.no_grad():
           # Apply softmax with 0.7 temperature (the best temperature)
@@ -244,6 +256,7 @@ def get_batches(phoneme_classifier, vocoder, batch_size=64, seq_len=256, fmax=50
         batch_y = []
         batch_f0 = []
         batch_prob = []
+        """
 
 
   """
@@ -298,7 +311,7 @@ def main(device='cpu', batch_size=32):
     fmax = wandb.fmax = 500
     k = wandb.k = 1
     counter = 0
-    for ep in range(100):
+    for ep in range(10000):
       for batch in get_batches(phoneme_classifier, vocoder, batch_size=batch_size, seq_len=seq_len, fmax=fmax, k=k, device=device):
         x, y = batch
         #x = torch.Tensor(x).to(device)
@@ -329,7 +342,8 @@ def main(device='cpu', batch_size=32):
             torch.save(model.state_dict(), './models/mel-generator-state_dict-{}it.pth'.format(counter))
             torch.save(saved_thing, './models/mel-generator-model-{}it.pth'.format(counter))
             generate(model, phoneme_classifier, vocoder, name='{}it'.format(counter), device=device, k=k)
+      print('batch {} done'.format(str(ep)))
   
 if __name__ == '__main__':
-    main(device='cpu', batch_size=32)
+    main(device='cpu', batch_size=4)
     
