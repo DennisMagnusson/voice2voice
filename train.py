@@ -9,11 +9,6 @@ import torch.nn.functional as F
 
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-#from util import wav_to_mel
-#from UniversalVocoding.preprocess import get_mel
-#from UniversalVocoding.utils import save_wav
-#from UniversalVocoding.model import Vocoder
-
 from phoneme_classifier.model import PhonemeClassifier
 from phoneme_classifier.read_data import get_wav, wav_to_mel, get_pyin
 
@@ -55,8 +50,13 @@ class MelGenerator(nn.Module):
     #self.linear2 = nn.Linear(512, 512)
     #self.cbhg2 = CBHG(512, 16)
 
-    self.declinear0 = nn.Linear(1024, 256)
+    self.declinear0 = nn.Linear(512, 256)
     self.declinear1 = nn.Linear(256, 80)
+
+    self.outconv1 = Conv2DThingy(1, 64, 5, nn.ReLU())
+    self.outconv2 = Conv2DThingy(64, 128, 5, nn.ReLU())
+    self.outconv3 = Conv2DThingy(128, 256, 5, nn.ReLU())
+    self.outconv4 = Conv2DThingy(256, 1, 5, None)
 
 
   def forward(self, x, hidden=None):
@@ -79,10 +79,34 @@ class MelGenerator(nn.Module):
 
     out = F.relu(self.declinear0(out))
     out = self.declinear1(out)
+
+
+    out = out.unsqueeze(1)
+    out = self.outconv1(out)
+    out = self.outconv2(out)
+    out = self.outconv3(out)
+    out = self.outconv4(out)
+
+    out = out.squeeze(1)
     
     out = 3*torch.sigmoid(out)
 
     return out, 0
+
+class Conv2DThingy(nn.Module):
+  def __init__(self, in_size, out_size, kernel_size, activation):
+    super(Conv2DThingy, self).__init__()
+    self.bn = nn.BatchNorm2d(out_size)
+    self.activation = activation
+    self.conv = nn.Conv2d(in_size, out_size, kernel_size, padding=kernel_size//2)
+
+  def forward(self, x):
+    out = self.conv(x)
+    out = self.bn(out)
+    if self.activation:
+      return self.activation(out)
+    return out
+
 
 
 class ConvThingy(nn.Module):
@@ -215,8 +239,7 @@ def generate(model, phoneme_classifier, vocoder, name='1it', device='cpu', k=1):
 
 def get_batches(phoneme_classifier, vocoder, batch_size=64, seq_len=256, fmax=500, k=4, device='cpu'):
   base_folder = './processed_data/'
-  #filenames = [x.split('.')[0] for x in listdir(base_folder) if x.endswith('.npy')]
-  filenames = [a.split('.')[0] for a in ['LJ042-0033.wav', 'LJ008-0195.wav', 'LJ050-0174.wav']]
+  filenames = [x.split('.')[0] for x in listdir(base_folder) if x.endswith('.npy')]
   random.shuffle(filenames)
   batch_x = []
   batch_y = []
@@ -237,42 +260,6 @@ def get_batches(phoneme_classifier, vocoder, batch_size=64, seq_len=256, fmax=50
         yield torch.Tensor(batch_x).to(device), torch.Tensor(batch_y).to(device)
         batch_x = []
         batch_y = []
-
-        """
-        batch_x = torch.Tensor(batch_x).to(device)
-        with torch.no_grad():
-          # Apply softmax with 0.7 temperature (the best temperature)
-          #batch_y, _ = F.softmax(phoneme_classifier(batch_x)/0.7)
-          batch_x, _ = phoneme_classifier(batch_x)
-          #inpu = torch.cat((batch_x.transpose(1, 2), torch.stack(batch_f0).unsqueeze(2), torch.stack(batch_prob).unsqueeze(2)), 2)
-          inpu = torch.cat((batch_x.transpose(1, 2), torch.stack(batch_f0).unsqueeze(2).to(device)), 2)
-
-          
-          #batch_y = F.softmax(batch_y/0.7, dim=1)
-
-        yield inpu, torch.Tensor(batch_y).to(device)
-        ti = time.time()
-        batch_x = []
-        batch_y = []
-        batch_f0 = []
-        batch_prob = []
-        """
-
-
-  """
-  for mel, phone in tqdm(zip(mels, phones), total=len(mels)):
-    for i in range(0, len(mel)-seq_len, seq_len):
-      batch_x.append(mel[i:i+seq_len])
-      batch_y.append(phone[i:i+seq_len])
-      
-      if len(batch_x) == seq_len:
-        yield torch.Tensor(batch_x), torch.LongTensor(batch_y)
-        batch_x = []
-        batch_y = []
-  """
-  
-  #yield torch.Tensor(batch_x), torch.LongTensor(batch_y)
-
 
 def get_vocoder():
     vocoder = torch.hub.load('descriptinc/melgan-neurips', 'load_melgan')
@@ -300,7 +287,7 @@ def main(device='cpu', batch_size=32):
     #optimizer = things['optimizer']
     #sched = things['scheduler']
 
-    sched = ReduceLROnPlateau(optimizer, factor=0.8, patience=100, threshold=0.000000001, verbose=True)
+    sched = ReduceLROnPlateau(optimizer, factor=0.8, patience=300, threshold=0.000000001, verbose=True)
     #criterion = nn.MSELoss()
     criterion = nn.L1Loss()
     torch.autograd.set_detect_anomaly(True)
