@@ -44,15 +44,20 @@ def get_wav(filename):
   wav = np.pad(wav, 1024+48-(len(wav) % 1024))
   return wav, sr
 
-def get_pyin(wav, sr, k=4, fmax=500):
+def get_pyin(wav, sr, k=4, fmax=500, probs=False):
   frame_length = 256*k
-  #f0, _, prob = librosa.pyin(wav, sr=sr, fmin=65, fmax=600, frame_length=frame_length, fill_na=65)
-  f0 = librosa.yin(wav, sr=sr, fmin=65, fmax=fmax, frame_length=frame_length)
+  if probs:
+    f0, _, prob = librosa.pyin(wav, sr=sr, fmin=65, fmax=fmax, frame_length=frame_length, fill_na=65)
+  else:
+    f0 = librosa.yin(wav, sr=sr, fmin=65, fmax=fmax, frame_length=frame_length)
   f0 = (librosa.hz_to_mel(f0)-librosa.hz_to_mel(65))/librosa.hz_to_mel(fmax)
   f0 = torch.Tensor(f0).repeat_interleave(k)
   #prob = torch.Tensor(prob).repeat_interleave(k)
   #return f0, prob
-  return f0
+  if probs:
+    return f0, torch.Tensor(prob).repeat_interleave(k)
+  else:
+    return f0
 
 
 def wav_to_mel(wav, sr):

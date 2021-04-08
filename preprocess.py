@@ -18,15 +18,15 @@ def preprocess(phoneme_classifier, vocoder, output_dir, seq_len=256, fmax=500, k
     mel_vocoder = vocoder(torch.Tensor([wav]))[0].T
 
     #f0, prob = get_pyin(wav, sr)
-    f0 = get_pyin(wav, sr, k=k, fmax=fmax)
-
+    f0, prob = get_pyin(wav, sr, k=k, fmax=fmax, probs=True)
     with torch.no_grad():
         # Apply softmax with 0.7 temperature (the best temperature)
         #batch_y, _ = F.softmax(phoneme_classifier(batch_x)/0.7)
         batch_x, _ = phoneme_classifier(torch.Tensor(mel_phoneme).unsqueeze(0))
 
     f0 = torch.Tensor(f0).unsqueeze(0).unsqueeze(2)
-    inpu = torch.cat((batch_x.transpose(1, 2), f0), 2)
+    prob = torch.Tensor(prob).unsqueeze(0).unsqueeze(2)
+    inpu = torch.cat((batch_x.transpose(1, 2), f0, prob), 2)
 
     mel_vocoder = (mel_vocoder.numpy() + 5.0) / 2.0
 
@@ -45,5 +45,5 @@ if __name__ == '__main__':
 
   vocoder = get_vocoder()
 
-  preprocess(phoneme_classifier, vocoder, './processed_data/', seq_len=256, fmax=500, k=1)
+  preprocess(phoneme_classifier, vocoder, './processed_data_with_probs/', seq_len=256, fmax=500, k=1)
 
