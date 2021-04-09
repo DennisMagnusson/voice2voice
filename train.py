@@ -97,9 +97,9 @@ class PostNet(nn.Module):
   def __init__(self, n_convs, hidden_size, mel_size):
     super(PostNet, self).__init__()
     self.convs = []
-    self.convs.append(ConvThingy(mel_size, hidden_size, 5, nn.ReLU))
+    self.convs.append(ConvThingy(mel_size, hidden_size, 5, nn.ReLU()))
     for _ in range(n_convs-2):
-      self.convs.append(ConvThingy(hidden_size, hidden_size, 5, nn.ReLU))
+      self.convs.append(ConvThingy(hidden_size, hidden_size, 5, nn.ReLU()))
     
     self.convs.append(ConvThingy(hidden_size, mel_size, 5, None))
     self.convs = nn.ModuleList(self.convs)
