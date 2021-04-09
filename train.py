@@ -105,10 +105,10 @@ class PostNet(nn.Module):
     self.convs = nn.ModuleList(self.convs)
 
   def forward(self, x):
-    out = x.transpose(1, 2)
+    out = x.transpose(1, 2).unsqueeze(1)
     for c in self.convs:
       out = c(out)
-    out = out.transpose(1, 2)
+    out = out.transpose(1, 2).squeeze(1)
     return out
 
 
