@@ -45,9 +45,9 @@ class MelGenerator(nn.Module):
     self.linear1 = nn.Linear(256, 256)
     self.pool = nn.MaxPool1d(8, stride=4, padding=2)
 
-    self.attn0 = AttentionThingy(256, 512, 256)
-    self.attn1 = AttentionThingy(256, 512, 256)
-    self.attn2 = AttentionThingy(256, 512, 256)
+    self.attn0 = AttentionThingy(256, 256, 256)
+    self.attn1 = AttentionThingy(256, 256, 256)
+    self.attn2 = AttentionThingy(256, 256, 256)
 
     self.cbhg1 = CBHG(256, 16)
 
@@ -102,6 +102,7 @@ class PostNet(nn.Module):
       self.convs.append(ConvThingy(hidden_size, hidden_size, 5, F.tanh))
     
     self.convs.append(ConvThingy(hidden_size, mel_size, 5, None))
+    self.convs = nn.ModuleList(self.convs)
 
   def forward(self, x):
     out = x.transpose(1, 2)
