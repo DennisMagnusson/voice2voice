@@ -151,7 +151,7 @@ class Conv2DThingy(nn.Module):
 
   def forward(self, x):
     #out = self.pad(x)
-    out = self.conv(out)
+    out = self.conv(x)
     #out = self.bn(out)
     if self.activation:
       return self.activation(out)
