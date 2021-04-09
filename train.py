@@ -45,9 +45,9 @@ class MelGenerator(nn.Module):
     self.linear1 = nn.Linear(256, 256)
     self.pool = nn.MaxPool1d(8, stride=4, padding=2)
 
-    self.attn0 = AttentionThingy(256, 256, 256)
-    self.attn1 = AttentionThingy(256, 256, 256)
-    self.attn2 = AttentionThingy(256, 256, 256)
+    self.attn0 = AttentionThingy(256, 512, 256)
+    self.attn1 = AttentionThingy(256, 512, 256)
+    self.attn2 = AttentionThingy(256, 512, 256)
 
     self.cbhg1 = CBHG(256, 16)
 
@@ -72,11 +72,13 @@ class MelGenerator(nn.Module):
 
     out = F.relu(self.linear1(out))
 
-    out0 = self.attn0(out)
-    out1 = self.attn1(out0)
-    out2 = self.attn2(out1)
+    out0, h0, h1, h2 = self.attn0(out)
+    out1, h0, h1, h2 = self.attn1(out0, h0, h1, h2)
+    out2, _, _, _ = self.attn2(out1, h0, h1, h2)
 
     out = self.cbhg1(out0 + out1 + out2)
+    #out = self.cbhg1(out)
+
     #out = F.relu(self.linear2(out))
     #out = self.cbhg2(out)
 
@@ -104,15 +106,15 @@ class AttentionThingy(nn.Module):
     #self.pad = nn.ConstantPad1d(((kernel_size-1)//2, kernel_size//2), 0)
     #self.conv = nn.Conv2d(in_size, out_size, kernel_size, padding=kernel_size//2)
 
-  def forward(self, x):
+  def forward(self, x, h0=None, h1=None, h2=None):
     out = F.relu(self.dropout0(self.prenet0(x)))
     out = F.relu(self.dropout1(self.prenet1(out)))
 
-    out, _ = self.attnrnn(out)
-    out0, _ = self.decrnn0(out)
-    out, _ = self.decrnn1(out0 + out)
+    out, h0 = self.attnrnn(out, hx=h0)
+    out0, h1 = self.decrnn0(out, hx=h1)
+    out, h2 = self.decrnn1(out0 + out, hx=h2)
 
-    return out
+    return out, h0, h1, h2
 
 
 class Conv2DThingy(nn.Module):
@@ -356,5 +358,5 @@ def main(device='cpu', batch_size=32):
       print('batch {} done'.format(str(ep)))
   
 if __name__ == '__main__':
-    main(device='cpu', batch_size=4)
+    main(device='cuda', batch_size=32)
     
