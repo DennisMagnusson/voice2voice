@@ -97,18 +97,18 @@ class PostNet(nn.Module):
   def __init__(self, n_convs, hidden_size, mel_size):
     super(PostNet, self).__init__()
     self.convs = []
-    self.convs.append(Conv2DThingy(mel_size, hidden_size, 5, nn.ReLU()))
+    self.convs.append(ConvThingy(mel_size, hidden_size, 5, nn.ReLU()))
     for _ in range(n_convs-2):
-      self.convs.append(Conv2DThingy(hidden_size, hidden_size, 5, nn.ReLU()))
+      self.convs.append(ConvThingy(hidden_size, hidden_size, 5, nn.ReLU()))
     
-    self.convs.append(Conv2DThingy(hidden_size, mel_size, 5, None))
+    self.convs.append(ConvThingy(hidden_size, mel_size, 5, None))
     self.convs = nn.ModuleList(self.convs)
 
   def forward(self, x):
-    out = x.transpose(1, 2).unsqueeze(1)
+    out = x.transpose(1, 2)
     for c in self.convs:
       out = c(out)
-    out = out.transpose(1, 2).squeeze(1)
+    out = out.transpose(1, 2)
     return out
 
 
@@ -151,7 +151,7 @@ class Conv2DThingy(nn.Module):
 
   def forward(self, x):
     #out = self.pad(x)
-    out = self.conv(x)
+    out = self.conv(out)
     #out = self.bn(out)
     if self.activation:
       return self.activation(out)
