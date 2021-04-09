@@ -365,7 +365,7 @@ def main(device='cpu', batch_size=32):
 
         #loss /= batch_size
         smooth_loss = smooth_loss*0.95 + loss.item()*0.05
-        loss.backward(retain_graph=retain_graph)
+        full_loss.backward(retain_graph=retain_graph)
         optimizer.step()
 
         wandb.log({'loss': loss.item()**2, 'total_loss': full_loss.item()**2, 'post_loss': post_loss.item()**2})
