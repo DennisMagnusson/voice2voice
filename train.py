@@ -89,7 +89,7 @@ class MelGenerator(nn.Module):
     
     mel_out = 3*torch.sigmoid(out)
 
-    post_out = 3*torch.sigmoid(self.postnet(mel_out))
+    post_out = 3*torch.sigmoid(self.postnet(out))
 
     return mel_out, post_out
 
