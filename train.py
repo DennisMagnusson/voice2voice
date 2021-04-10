@@ -45,9 +45,9 @@ class MelGenerator(nn.Module):
     self.linear1 = nn.Linear(256, 256)
     self.pool = nn.MaxPool1d(8, stride=4, padding=2)
 
-    self.attn0 = AttentionThingy(256, 256, 256)
-    self.attn1 = AttentionThingy(256, 256, 256)
-    self.attn2 = AttentionThingy(256, 256, 256)
+    self.attn0 = AttentionThingy(256, 512, 256)
+    self.attn1 = AttentionThingy(256, 512, 256)
+    self.attn2 = AttentionThingy(256, 512, 256)
 
     self.cbhg1 = CBHG(256, 16)
 
@@ -56,7 +56,7 @@ class MelGenerator(nn.Module):
     self.declinear0 = nn.Linear(512, 256)
     self.declinear1 = nn.Linear(256, 80)
 
-    self.postnet = PostNet(5, 512, 80)
+    self.postnet = postnet(5, 512, 80)
 
 
   def forward(self, x, hidden=None):
@@ -87,31 +87,9 @@ class MelGenerator(nn.Module):
     out = F.relu(self.declinear0(out))
     out = self.declinear1(out)
     
-    mel_out = 3*torch.sigmoid(out)
+    out = 3*torch.sigmoid(out)
 
-    post_out = self.postnet(mel_out) + mel_out
-
-    return mel_out, post_out
-
-class PostNet(nn.Module):
-  def __init__(self, n_convs, hidden_size, mel_size):
-    super(PostNet, self).__init__()
-    self.convs = []
-    self.convs.append(ConvThingy(mel_size, hidden_size, 5, nn.ReLU()))
-    for _ in range(n_convs-2):
-      self.convs.append(ConvThingy(hidden_size, hidden_size, 5, nn.ReLU()))
-    
-    self.convs.append(ConvThingy(hidden_size, mel_size, 5, None))
-    self.convs = nn.ModuleList(self.convs)
-
-  def forward(self, x):
-    out = x.transpose(1, 2)
-    for c in self.convs:
-      out = c(out)
-    out = out.transpose(1, 2)
-    return out
-
-
+    return out, 0
 
 class AttentionThingy(nn.Module):
   def __init__(self, in_size, hidden_size, out_size):
@@ -143,7 +121,7 @@ class AttentionThingy(nn.Module):
 
 class Conv2DThingy(nn.Module):
   def __init__(self, in_size, out_size, kernel_size, activation):
-    super(Conv2DThingy, self).__init__()
+    super(ConvThingy, self).__init__()
     #self.bn = nn.BatchNorm2d(out_size)
     self.activation = activation
     #self.pad = nn.ConstantPad1d(((kernel_size-1)//2, kernel_size//2), 0)
@@ -252,7 +230,7 @@ def generate(model, phoneme_classifier, vocoder, name='1it', device='cpu', k=1):
       #phones = F.softmax(phones/0.7, dim=1)
       #inpu = torch.cat((phones.transpose(1, 2), torch.Tensor(f0), torch.Tensor(prob)), 1)
       inpu = torch.cat((phones.transpose(1, 2), f0.unsqueeze(0).unsqueeze(2)), 2)
-      mel2_pre, mel2 = model(inpu)
+      mel2, _ = model(inpu)
       #print(mel2.shape)
       
       #for ex in [1.0, 1.25, 1.5, 1.75, 2.0]:
@@ -338,7 +316,7 @@ def main(device='cpu', batch_size=32):
     #sched = things['scheduler']
 
     sched = ReduceLROnPlateau(optimizer, factor=0.8, patience=300, threshold=0.000000001, verbose=True)
-    criterion_post = nn.L1Loss()
+    #criterion = nn.MSELoss()
     criterion = nn.L1Loss()
     torch.autograd.set_detect_anomaly(True)
 
@@ -358,24 +336,23 @@ def main(device='cpu', batch_size=32):
         retain_graph = True
 
         optimizer.zero_grad()
-        logits, post_out = model.forward(x, hidden=hx)
+        logits, _ = model.forward(x, hidden=hx)
         loss = criterion(logits, y)
-        post_loss = criterion_post(post_out, y)
-        full_loss = loss + post_loss
-
+        
         #loss /= batch_size
         smooth_loss = smooth_loss*0.95 + loss.item()*0.05
-        full_loss.backward(retain_graph=retain_graph)
+        loss.backward(retain_graph=retain_graph)
         optimizer.step()
 
-        wandb.log({'loss': loss.item()**2, 'total_loss': full_loss.item()**2, 'post_loss': post_loss.item()**2})
+        wandb.log({'loss': loss.item()**2})
+
         
         sched.step(loss.item())
 
         if counter % 25 == 0 or counter == 1:
           print('iter: {} loss: {}, smooth_loss: {}'.format(counter, loss.item(), smooth_loss))
 
-          if counter % 3000 == 0 or counter == 1:
+          if counter % 500 == 0 or counter == 1:
             saved_thing = {'model': model, 'optimizer': optimizer, 'scheduler': sched}
             torch.save(model.state_dict(), './models/mel-generator-state_dict-{}it.pth'.format(counter))
             torch.save(saved_thing, './models/mel-generator-model-{}it.pth'.format(counter))
