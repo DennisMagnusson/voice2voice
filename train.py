@@ -54,10 +54,12 @@ class MelGenerator(nn.Module):
     self.conv8 = ConvThingy(256, 256, 5, nn.ReLU())
     self.conv9 = ConvThingy(256, 512, 5, nn.ReLU())
 
-    #self.convdd0 = Conv2DThingy(1, 256, 5, nn.ReLU())
-    #self.convdd1 = Conv2DThingy(256, 256, 5, nn.ReLU())
-    #self.convdd2 = Conv2DThingy(256, 256, 5, nn.ReLU())
-    #self.convdd3 = Conv2DThingy(256, 256, 5, nn.ReLU())
+    self.convdd0 = Conv2DThingy(1, 32, 5, nn.ReLU())
+    self.convdd1 = Conv2DThingy(32, 32, 5, nn.ReLU())
+    self.convdd2 = Conv2DThingy(32, 32, 5, nn.ReLU())
+    self.convdd3 = Conv2DThingy(32, 32, 5, nn.ReLU())
+    self.convdd10 = Conv2DThingy(32, 1, 5, None)
+
 
     #self.convdd10 = Conv2DThingy(256, 1, 5, nn.ReLU())
 
@@ -86,6 +88,9 @@ class MelGenerator(nn.Module):
     out = self.conv8(out) + out
     out = self.conv9(out)
     out = out.transpose(1, 2)
+    out = F.relu(self.declinear0(out))
+    out = self.declinear1(out)
+
     """
     out = out.unsqueeze(1)
     out = self.convdd0(out)
@@ -99,9 +104,7 @@ class MelGenerator(nn.Module):
     #out = self.convdd6(out)
     #out = out.squeeze(1)
 
-    out = F.relu(self.declinear0(out))
-    out = self.declinear1(out)
-    
+        
     out = 3*F.hardsigmoid(out)
 
     return out, 0
@@ -375,5 +378,5 @@ def main(device='cpu', batch_size=32):
       print('batch {} done'.format(str(ep)))
   
 if __name__ == '__main__':
-    main(device='cpu', batch_size=8)
+    main(device='cuda', batch_size=32)
     
