@@ -40,23 +40,29 @@ class MelGenerator(nn.Module):
     #self.linear0 = nn.Linear(256, 128)
     #self.cbhg0 = CBHG(128, 8)
 
-    self.conv0 = ConvThingy(128, 128, 3, nn.ReLU())
-    self.conv1 = ConvThingy(128, 256, 3, nn.ReLU())
+    self.conv0 = ConvThingy(128, 128, 7, nn.ReLU())
+    self.conv1 = ConvThingy(128, 256, 7, nn.ReLU())
     self.linear1 = nn.Linear(256, 256)
-    self.pool = nn.MaxPool1d(8, stride=4, padding=2)
+    self.pool = nn.AvgPool1d(4, stride=4)
 
-    self.attn0 = AttentionThingy(256, 512, 256)
-    self.attn1 = AttentionThingy(256, 512, 256)
-    self.attn2 = AttentionThingy(256, 512, 256)
+    self.conv2 = ConvThingy(256, 256, 5, nn.ReLU())
+    self.conv3 = ConvThingy(256, 256, 5, nn.ReLU())
+    self.conv4 = ConvThingy(256, 256, 5, nn.ReLU())
+    self.conv5 = ConvThingy(256, 256, 5, nn.ReLU())
+    self.conv6 = ConvThingy(256, 256, 5, nn.ReLU())
+    self.conv7 = ConvThingy(256, 256, 5, nn.ReLU())
+    self.conv8 = ConvThingy(256, 256, 5, nn.ReLU())
+    self.conv9 = ConvThingy(256, 512, 5, nn.ReLU())
 
-    self.cbhg1 = CBHG(256, 16)
+    #self.convdd0 = Conv2DThingy(1, 256, 5, nn.ReLU())
+    #self.convdd1 = Conv2DThingy(256, 256, 5, nn.ReLU())
+    #self.convdd2 = Conv2DThingy(256, 256, 5, nn.ReLU())
+    #self.convdd3 = Conv2DThingy(256, 256, 5, nn.ReLU())
 
-    self.linear2 = nn.Linear(256, 256)
+    #self.convdd10 = Conv2DThingy(256, 1, 5, nn.ReLU())
 
     self.declinear0 = nn.Linear(512, 256)
     self.declinear1 = nn.Linear(256, 80)
-
-    self.postnet = postnet(5, 512, 80)
 
 
   def forward(self, x, hidden=None):
@@ -70,24 +76,33 @@ class MelGenerator(nn.Module):
     out = self.conv0(out)
     out = self.conv1(out)
     out = self.pool(out)
+    out = self.conv2(out) + out
+    out = self.conv3(out) + out
+    out = self.conv4(out) + out
+    out = self.conv5(out) + out
+    out = self.conv6(out) + out
+    out = self.conv7(out) + out
+    out = self.conv8(out) + out
+    out = self.conv8(out) + out
+    out = self.conv9(out)
     out = out.transpose(1, 2)
+    """
+    out = out.unsqueeze(1)
+    out = self.convdd0(out)
+    out = self.convdd10(out)
+    out = out.squeeze(1)
+    """
+    #out = self.convdd1(out) + out
+    #out = self.convdd2(out) + out
+    #out = self.convdd3(out) + out
 
-    out = F.relu(self.linear1(out))
-
-    out0, h0, h1, h2 = self.attn0(out)
-    out1, h0, h1, h2 = self.attn1(out0, h0, h1, h2)
-    out2, _, _, _ = self.attn2(out1, h0, h1, h2)
-
-    out = self.cbhg1(out0 + out1 + out2)
-    #out = self.cbhg1(out)
-
-    #out = F.relu(self.linear2(out))
-    #out = self.cbhg2(out)
+    #out = self.convdd6(out)
+    #out = out.squeeze(1)
 
     out = F.relu(self.declinear0(out))
     out = self.declinear1(out)
     
-    out = 3*torch.sigmoid(out)
+    out = 3*F.hardsigmoid(out)
 
     return out, 0
 
@@ -121,16 +136,16 @@ class AttentionThingy(nn.Module):
 
 class Conv2DThingy(nn.Module):
   def __init__(self, in_size, out_size, kernel_size, activation):
-    super(ConvThingy, self).__init__()
-    #self.bn = nn.BatchNorm2d(out_size)
+    super(Conv2DThingy, self).__init__()
+    self.bn = nn.BatchNorm2d(out_size)
     self.activation = activation
     #self.pad = nn.ConstantPad1d(((kernel_size-1)//2, kernel_size//2), 0)
     self.conv = nn.Conv2d(in_size, out_size, kernel_size, padding=kernel_size//2)
 
   def forward(self, x):
     #out = self.pad(x)
-    out = self.conv(out)
-    #out = self.bn(out)
+    out = self.conv(x)
+    out = self.bn(out)
     if self.activation:
       return self.activation(out)
     return out
@@ -360,5 +375,5 @@ def main(device='cpu', batch_size=32):
       print('batch {} done'.format(str(ep)))
   
 if __name__ == '__main__':
-    main(device='cuda', batch_size=32)
+    main(device='cpu', batch_size=8)
     
