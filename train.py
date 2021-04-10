@@ -58,6 +58,7 @@ class MelGenerator(nn.Module):
     self.convdd1 = Conv2DThingy(32, 32, 5, nn.ReLU())
     self.convdd2 = Conv2DThingy(32, 32, 5, nn.ReLU())
     self.convdd3 = Conv2DThingy(32, 32, 5, nn.ReLU())
+    self.convdd4 = Conv2DThingy(32, 32, 5, nn.ReLU())
     self.convdd10 = Conv2DThingy(32, 1, 5, None)
 
 
@@ -91,12 +92,14 @@ class MelGenerator(nn.Module):
     out = F.relu(self.declinear0(out))
     out = self.declinear1(out)
 
-    """
     out = out.unsqueeze(1)
     out = self.convdd0(out)
+    out = self.convdd1(out) + out
+    out = self.convdd2(out) + out
+    out = self.convdd3(out) + out
+    out = self.convdd4(out) + out
     out = self.convdd10(out)
     out = out.squeeze(1)
-    """
     #out = self.convdd1(out) + out
     #out = self.convdd2(out) + out
     #out = self.convdd3(out) + out
