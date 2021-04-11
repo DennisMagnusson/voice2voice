@@ -362,7 +362,7 @@ def main(device='cpu', batch_size=32):
         if counter % 25 == 0 or counter == 1:
           print('iter: {} loss: {}, smooth_loss: {}'.format(counter, loss.item(), smooth_loss))
 
-          if counter % 500 == 0 or counter == 1:
+          if counter % 3000 == 0 or counter == 1:
             saved_thing = {'model': model, 'optimizer': optimizer, 'scheduler': sched}
             torch.save(model.state_dict(), './models/mel-generator-state_dict-{}it.pth'.format(counter))
             torch.save(saved_thing, './models/mel-generator-model-{}it.pth'.format(counter))
