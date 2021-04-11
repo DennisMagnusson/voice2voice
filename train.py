@@ -28,6 +28,8 @@ import numpy as np
 
 import wandb
 
+from sys import argv
+
 
 class MelGenerator(nn.Module):
   def __init__(self):
@@ -368,5 +370,8 @@ def main(device='cpu', batch_size=32):
       print('batch {} done'.format(str(ep)))
   
 if __name__ == '__main__':
-    main(device='cuda', batch_size=32)
+    if len(argv) == 1:
+      main(device='cpu', batch_size=4)
+    else:
+      main(device=argv[1], batch_size=int(argv[2]))
     
