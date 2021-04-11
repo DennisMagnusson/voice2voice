@@ -63,7 +63,7 @@ class MelGenerator(nn.Module):
     for i in range(4):
       self.convies2d.append(Conv2DThingy(conv2d_size, conv2d_size, 5, nn.ReLU()))
     self.convies2d = nn.ModuleList(self.convies2d)
-    self.convdd10 = Conv2DThingy(32, 1, 5, None)
+    self.convdd10 = Conv2DThingy(conv2d_size, 1, 5, None)
 
     #self.convdd10 = Conv2DThingy(256, 1, 5, nn.ReLU())
 
