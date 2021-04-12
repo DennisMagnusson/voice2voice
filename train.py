@@ -316,7 +316,7 @@ def main(device='cpu', batch_size=32):
           loss.backward()
           optimizer.step()
           
-          if counter > 10:
+          if counter > 60:
             disc.zero_grad()
             #d_optimizer.zero_grad()
             outputs = disc.forward(y)
