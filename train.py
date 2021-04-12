@@ -306,7 +306,7 @@ def main(device='cpu', batch_size=32):
         counter += 1
         retain_graph = True
 
-        if counter < 50:# Pretrain generator
+        if counter < 200:# Pretrain generator
           model.zero_grad()
           fake_mel, _ = model.forward(x)
           loss = gen_criterion(fake_mel, y)
@@ -316,7 +316,7 @@ def main(device='cpu', batch_size=32):
           loss.backward()
           optimizer.step()
           
-          if counter > 60:
+          if counter > 600:
             disc.zero_grad()
             #d_optimizer.zero_grad()
             outputs = disc.forward(y)
