@@ -279,7 +279,7 @@ def main(device='cpu', batch_size=32):
     vocoder = get_vocoder()#torch.hub.load('descriptinc/melgan-neurips', 'load_melgan')
 
     model = MelGenerator().to(device)
-    disc = Discriminator(seq_len)
+    disc = Discriminator(seq_len).to(device)
     wandb.watch(model)
     #model.load_state_dict(torch.load('./models/mel-generator-state_dict-500it.pth'))
     #lr = wandb.config.lr = 4e-4
