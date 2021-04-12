@@ -335,12 +335,12 @@ def main(device='cpu', batch_size=32):
           # Train on reals
           disc.zero_grad()
           outputs = disc.forward(y)
-          d_loss_real = criterion(outputs, torch.ones_like(batch_size))
+          d_loss_real = criterion(outputs, torch.ones_like(outputs))
           d_loss_real.backward()
           # Train on fakes
           fake_mels, _ = model.forward(x)
           outputs = disc.forward(fake_mels.detach())
-          d_loss_fake = criterion(outputs, torch.zeros_like(batch_size))
+          d_loss_fake = criterion(outputs, torch.zeros_like(outputs))
           d_loss_fake.backward()
           d_optimizer.step()
           # Train generator
@@ -349,10 +349,9 @@ def main(device='cpu', batch_size=32):
           outputs = disc.forward(fake_mels)
           g_loss = criterion(outputs, torch.ones_like(outputs))
           gen_loss = gen_criterion(fake_mels, y)
-          tot_loss = g_loss + gen_loss
+          tot_loss = g_loss + gen_loss*10
           tot_loss.backward()
           g_optimizer.step()
-          print(outputs)
 
           di = {'d_loss':(d_loss_real.mean().item() + d_loss_fake.mean().item())/2.0,
                      'g_loss': g_loss.mean().item(),
